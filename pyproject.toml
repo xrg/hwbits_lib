@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm", "setuptools-scm[simple]", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+dynamic = ["version"]
+name = "hwbits_lib"
+authors = [
+    {name = "Panos Christeas", email = "xrg@pefnos.com"},
+]
+description = "Hardware registers semantic representation"
+readme = { file = "README.md", content-type = "text/markdown"}
+requires-python = ">=3.10"
+keywords = ["hardware", "registers"]
+license = "MIT"
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = []
+
+
+[tool.setuptools]
+packages = ["hwbits_lib"]
