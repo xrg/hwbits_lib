@@ -10,7 +10,7 @@ import time
 
 from .hwstructs import (
     DataStruct,
-    GUID,
+    HwBytes,
     MultiSectionsVar,
     Nested,
     ParentBody,
@@ -19,7 +19,8 @@ from .hwstructs import (
     Text,
     UChar,
 )
-from .little_endian import DynSizeUL, StaticUL, ULong, ULong64, UShort
+from .little_endian import DynSizeUL, GUID, MappedGUID, \
+        StaticUL, ULong, ULong64, ULongEnum, UShort
 from .registers import HwBits, HwRegister
 
 # fmt: off

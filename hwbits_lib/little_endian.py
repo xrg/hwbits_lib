@@ -16,7 +16,16 @@ from __future__ import annotations
 
 import struct
 
-from .hwstructs import DataStruct2Member, DynSizeBase, Static
+from .hwstructs import DataStruct2Enum, DataStruct2Member, DynSizeBase, \
+        GUID_base, MappedGUID_base, Static
+
+
+class GUID(GUID_base):
+    _big_endian = False
+
+
+class MappedGUID(MappedGUID_base):
+    _big_endian = False
 
 
 class UShort(DataStruct2Member):

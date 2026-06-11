@@ -9,7 +9,7 @@ import struct
 import typing
 import uuid
 
-from typing import Optional, Tuple, Type
+from typing import Any, Optional, Tuple, Type
 
 
 # fmt: off
@@ -265,16 +265,38 @@ class HwBytes(DataStructMember):
             return d
 
 
-class GUID(DataStructMember):
-    """"GUID/UUID member"""
+class GUID_base(DataStructMember):
+    """"GUID/UUID member
+
+    Note that by the parent UEFI standard, CPER
+    """
     _size = 16
+    _big_endian: bool
 
     def __get__(self, data: DataStruct, owner=None):
         if data is None:
             return self
 
         u = data[self._offset:self._offset + 16]
-        return uuid.UUID(bytes=bytes(u))
+        if self._big_endian:
+            return uuid.UUID(bytes=bytes(u))
+        else:
+            return uuid.UUID(bytes_le=bytes(u))
+
+
+class MappedGUID_base(GUID_base):
+    __slots__ = ("_offset", "_map")
+
+    def __init__(self, offset: int, map: dict[uuid.UUID, Any]):
+        super().__init__(offset)
+        self._map = map
+
+    def __get__(self, data: DataStruct, owner=None):
+        if data is None:
+            return self
+
+        u = super().__get__(data, owner)
+        return self._map.get(u, u)
 
 
 class Text(DataStructMember):
