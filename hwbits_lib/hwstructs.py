@@ -189,7 +189,7 @@ class Static(DataStructMember):
     """
     __slots__ = ("_offset", "_size", "_expected")
 
-    def __init__(self, offset:int, expected: bytes):
+    def __init__(self, offset: int, expected: bytes):
         self._offset = offset
         self._size = len(expected)
         self._expected = expected
@@ -281,7 +281,7 @@ class Text(DataStructMember):
     """Text string, with optional encoding"""
     __slots__ = ("_offset", "_size", "_encoding")
 
-    def __init__(self, offset: int, size: int, encoding:str = 'ascii'):
+    def __init__(self, offset: int, size: int, encoding: str = 'ascii'):
         self._offset = offset
         self._size = size
         self._encoding = encoding

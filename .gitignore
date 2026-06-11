@@ -1,3 +1,5 @@
 /build
 *.egg-info/
 *.kate-swp
+__pycache__
+hwbits_lib*.whl

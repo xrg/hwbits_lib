@@ -66,7 +66,7 @@ class CPER_timestamp(DataStruct):
     century = UChar(7)
 
     def __str__(self):
-        return f"{self.century-1}{self.year:02d}-{self.month:02d}-{self.day:02d} "\
+        return f"{self.century-1}{self.year:02d}-{self.month:02d}-{self.day:02d} " \
                 f"{self.hours:02d}:{self.minutes:02d}:{self.seconds:02d}"
 
     @property
@@ -74,11 +74,12 @@ class CPER_timestamp(DataStruct):
         return self.__int__()
 
     def __int__(self):
-        year = (self.century -1) * 100 + self.year
+        year = (self.century - 1) * 100 + self.year
         ts = time.mktime((year, self.month, self.day,
-                            self.hours, self.minutes, self.seconds,
-                            -1, -1, -1))
+                          self.hours, self.minutes, self.seconds,
+                          -1, -1, -1))
         return int(ts)
+
 
 class CPER(DataStruct):
     _name_var = "notification_type"
