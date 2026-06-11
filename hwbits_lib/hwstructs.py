@@ -241,6 +241,26 @@ class DataStruct2Member(DataStructMember, metaclass=structPoweredMember):  # pyr
         return self._struct.unpack(d)[0]
 
 
+class DataStruct2Enum(DataStruct2Member, metaclass=structPoweredMember):
+    """Decode using `struct`, pass to Enum to instantiate
+
+    In fact, this should work with any other class that can take a simple
+    instantiation from a data value.
+    """
+
+    __slots__ = ('_offset', '_type')
+
+    def __init__(self, offset: int, type: Type):
+        self._offset = offset
+        self._type = type
+
+    def __get__(self, data: DataStruct, owner=None):
+        if data is None:
+            return self
+        d = data[self._offset:self._offset + self._struct.size]
+        return self._type(self._struct.unpack(d)[0])
+
+
 class UChar(DataStruct2Member):
     """Unsigned char"""
     _struct_fmt = "<B"

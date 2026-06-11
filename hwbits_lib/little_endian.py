@@ -45,5 +45,9 @@ class StaticUL(Static):
         super().__init__(offset, expected=struct.pack("<L", expected))
 
 
+class ULongEnum(DataStruct2Enum):
+    _struct_fmt = "<L"
+
+
 class DynSizeUL(ULong, DynSizeBase):
     """ULong, also used for size of the structure"""
