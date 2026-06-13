@@ -383,7 +383,13 @@ class DataStructExtraData(DataStructDescr):
 
 
 class Nested(DataStructExtraData):
-    """Nest substruct in this struct"""
+    """Nest substruct in this struct
+
+    The value of this attribute will be a DataStruct itself, like:
+
+        parent.nested: SomeOtherStruct
+        parent.nested.foo  # with .foo being an attribute of SomeOtherStruct
+    """
 
     def __init__(self, offset: int, klass: Type[DataStruct]):
         self._offset = offset
@@ -405,7 +411,12 @@ class Nested(DataStructExtraData):
 
 
 class MultiSectionsFixed(DataStructExtraData):
-    """Defines Nx sections (of some struct) """
+    """Defines Nx sections (of some struct)
+
+    ie:
+        parent.sections: list[SectionClass]
+        parent.sections[3].section_type ...
+    """
 
     def __init__(self, offset: int, count: int, klass: Type[DataStruct]):
         self._offset = offset
@@ -434,7 +445,16 @@ class MultiSectionsFixed(DataStructExtraData):
 
 
 class MultiSectionsVar(DataStructExtraData):
-    """Defines Nx sections (of some struct), variable length"""
+    """Defines Nx sections (of some struct), variable length
+
+    Same as `MultiSectionsFixed` , but with the number of sections provided
+    through a dynamic attribute of the parent.
+
+    Like:
+        parent.num_sections = 3  # count defined there
+        parent.sections: Sections[3]
+        parent.sections[2].section_type = ...
+    """
 
     def __init__(self, offset: int, count_var: str, klass: Type[DataStruct]):
         self._offset = offset
