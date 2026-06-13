@@ -502,3 +502,98 @@ class ParentBody(DataStructExtraData):
         length = getattr(data, self._length_var)
         mv = memoryview(data._data.obj)
         setattr(data, f"_{self._name}", mv[offset:offset+length])
+
+
+class Array(DataStructExtraData):
+    """Field as an array of scalar fields
+
+    eg:
+        class SomeStruct(DataStruct):
+            regs = Array(2, ULong, count=4)
+
+    Means that `regs` will be an array of ULong[4] , at offset = 2 (bytes)
+    .. or, `regs` will behave like an array of ULong[4]
+    """
+
+    class _Slicer:
+        """Emulate an array, with the data coming from a memoryview
+        """
+#    ...
+
+        __slots__ = ('_parent', '_data')
+
+        def __init__(self, parent: Array, view: memoryview):
+            self._parent = parent
+            self._data = view
+
+        def __repr__(self):
+            return f"Array<{self._parent._type_inst}, {self._parent._count}>"
+
+        def __getitem__(self, key):
+            ts = self._parent._type_inst
+            if isinstance(key, int):
+                if key < 0 or key >= self._parent._count:
+                    raise IndexError(key)
+                return ts.__get__(self._data[(key * ts.size):])
+            elif isinstance(key, slice):
+                pos = 0 if key.start is None else key.start
+                step = 1 if key.step is None else key.step
+                stop = self._parent._count
+                if key.stop is not None:
+                    stop = min(key.stop, stop)
+
+                r = []
+                while pos < stop:
+                    r.append(ts.__get__(self._data[(pos * ts.size):]))
+                    pos += step
+                return r
+            else:
+                raise TypeError(f"slice must be int or range, not {type(key)}")
+
+        def __setitem__(self, key, value):
+            raise NotImplementedError()
+
+        def __len__(self):
+            return self._parent._count
+
+        def __iter__(self):
+            ts = self._parent._type_inst
+            for pos in range(0, self._parent._count):
+                yield ts.__get__(self._data[(pos * ts.size):])
+
+    def __init__(self, offset, klass: Type[DataStructMember], *args,
+                 count=None, size=None,
+                 _dyn_size=False):
+        """
+            :param klass: some DataStructMember type
+            :param *args: to be used for `klass` instantiation
+            :param _dyn_size: reserved for subclasses when they're doing
+                their `super().__init__()` to signal that they will be dynamic
+        """
+        super().__init__()
+        self._offset = offset
+        self._type_inst = klass(0, *args)  # offset=0
+        if count is not None:
+            self._count = count
+        elif size is not None:
+            self._count = size // self._type_inst.size
+        elif _dyn_size:
+            self._count = None  # to be computed by override, later
+        else:
+            raise TypeError("Either count or size need to be defined")
+
+    def _check(self, name: str, data: DataStruct) -> None:
+        if self._count is None:
+            raise RuntimeError(f"Count in {data.__class__.__name__}.{name} "
+                               f"<{self.__class__.__name__}> is not computed")
+        if len(data) < self._offset + self.size:
+            raise IndexError(f"Not enough data for {name}= {self.size}")
+
+    def _init_extra(self, data: DataStruct):
+        # assume that this follows a call to _check() which will set _count
+        mv = memoryview(data._data)[self._offset:self._offset + self.size]
+        setattr(data, f"_{self._name}", self._Slicer(self, mv))
+
+    @property
+    def size(self):
+        return self._count * self._type_inst.size
