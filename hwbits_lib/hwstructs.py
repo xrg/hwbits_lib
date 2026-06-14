@@ -1,4 +1,5 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates.
+# Copyright (c) Panos Christeas
 #
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
@@ -146,7 +147,7 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
             self._data = buf.read(self.__static_size)
         if len(self._data) < self.__static_size:
             raise IOError(5, "Stream data is shorter than struct: "
-                            f"{len(self._data)} < {self.__static_size}")
+                          f"{len(self._data)} < {self.__static_size}")
 
         if self.__dyn_size_member:
             ds = getattr(self, self.__dyn_size_member)
