@@ -185,6 +185,13 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
             return str(getattr(self, self._name_var))
         return repr(self)
 
+    @property
+    def __dict__(self):
+        return {
+            name: descr.__get__(self, self.__class__)
+            for name, descr in self.__iter_members()
+        }
+
 
 class RegisteredDataStruct(DataStruct):
     """Subclass this to build a registry of alternate DataStructs
