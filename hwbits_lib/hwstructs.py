@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import logging
 import struct
 import typing
 import uuid
@@ -13,7 +14,9 @@ import uuid
 from typing import Any, Optional, Tuple, Type
 
 
-# fmt: off
+log = logging.getLogger(__name__)
+
+
 class DataStructDescr:
     """Any descriptor (direct or indirect) of the DataStruct"""
 
@@ -75,7 +78,7 @@ class DataStructMeta(type):
             for b in bases:
                 if sls := getattr(b, '__slots__', None):
                     slots += sls
-            min_size = None
+            min_size = kwds.pop('min_size', None)
 
             # locate descriptor with highest offset
             cur_dyn = None
@@ -145,7 +148,7 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
             self._data = buf[:self.__static_size]
         else:
             self._data = buf.read(self.__static_size)
-        if len(self._data) < self.__static_size:
+        if self.__static_size is not None and len(self._data) < self.__static_size:
             raise IOError(5, "Stream data is shorter than struct: "
                           f"{len(self._data)} < {self.__static_size}")
 
@@ -181,6 +184,38 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
         if self._name_var:
             return str(getattr(self, self._name_var))
         return repr(self)
+
+
+class RegisteredDataStruct(DataStruct):
+    """Subclass this to build a registry of alternate DataStructs
+
+    Under this type, the first layer of subclass should declare its registry:
+
+        class AltPayloads(RegisteredDataStruct):
+            _color_registry = {}  # 'color' is now our magic key
+
+        class GreenPayload(AltPayloads, color="green"):
+            ...  # this will register under '_color_registry["green"]'
+
+
+    And then, we can lookup that first layer for our available implementations:
+        AltPayloads._lookup(key="color", val="green") -> GreenPayload
+
+    """
+
+    def __init_subclass__(cls, /, **kwargs):
+        for k in list(kwargs):
+            if hasattr(cls, f"_{k}_registry"):
+                val = kwargs.pop(k)
+                reg = getattr(cls, f"_{k}_registry")
+                reg[val] = cls
+
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def _lookup(cls, key: str, val: Any) -> Type[RegisteredDataStruct]:
+        reg = getattr(cls, f"_{key}_registry")
+        return reg[val]
 
 
 class Static(DataStructMember):
@@ -503,6 +538,41 @@ class ParentBody(DataStructExtraData):
         length = getattr(data, self._length_var)
         mv = memoryview(data._data.obj)
         setattr(data, f"_{self._name}", mv[offset:offset+length])
+
+
+class LookupParent(ParentBody):
+    """Variant of ParentBody that will dynamically assign a payload class
+    """
+
+    def __init__(self, offset_var: str, length_var: str, klass: Type[RegisteredDataStruct],
+                 **kwargs):
+        super().__init__(offset_var, length_var)
+        self._reg_klass = klass
+        if len(kwargs) != 1:
+            raise TypeError("Need to supply just one keyword argument to LookupParent")
+        self._lookup_key, self._lookup_var = next(iter(kwargs.items()))
+
+    def _check(self, name: str, data: DataStruct) -> None:
+        offset = getattr(data, self._offset_var)
+        length = getattr(data, self._length_var)
+        if not isinstance(data._data, memoryview):
+            raise TypeError("ParentBody only works in nested structs")
+        parent_data = data._data.obj
+        if offset + length > len(parent_data):
+            raise IndexError(f"Not enough data for {name} at data[{offset} + {length}]")
+
+    def _init_extra(self, data: DataStruct):
+        offset = getattr(data, self._offset_var)
+        length = getattr(data, self._length_var)
+        mv = memoryview(data._data.obj)[offset:offset+length]
+        lval = getattr(data, self._lookup_var)
+        try:
+            kls = self._reg_klass._lookup(self._lookup_key, lval)
+        except KeyError:
+            log.debug("Could not find known %s in registry for %s=%r",
+                      self._reg_klass.__name__, self._lookup_key, lval)
+            kls = self._reg_klass
+        setattr(data, f"_{self._name}", kls(mv))
 
 
 class Array(DataStructExtraData):

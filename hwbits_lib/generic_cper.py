@@ -11,10 +11,12 @@ import time
 from .hwstructs import (
     DataStruct,
     HwBytes,
+    LookupParent,
     MultiSectionsVar,
     Nested,
     ParentBody,
     Reg,
+    RegisteredDataStruct,
     Static,
     Text,
     UChar,
@@ -63,6 +65,10 @@ class CPER_section_flags(HwRegister):
     overflow = HwBits(7)
 
 
+class CPER_section_body(RegisteredDataStruct):
+    _uuid_registry = {}
+
+
 class CPER_section_descr(DataStruct):
     _name_var = "section_type"
 
@@ -77,7 +83,8 @@ class CPER_section_descr(DataStruct):
     severity = ULongEnum(48, Severity)
     FRU_text = Text(52, 20)
 
-    body = ParentBody("offset", "length")
+    body = LookupParent("offset", "length", CPER_section_body,
+                        uuid="section_type")
 
 
 class CPER_tstamp_bits(HwRegister):
