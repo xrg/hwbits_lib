@@ -7,6 +7,8 @@ import os.path
 from hwbits_lib.hwstructs import DataStruct
 from hwbits_lib.generic_cper import CPER
 
+import hwbits_lib.cper_sections as _
+
 
 def print_cper(fname: str):
     with open(os.path.expanduser(fname), 'rb') as fp:
