@@ -36,7 +36,10 @@ def print_cper(fname: str):
             print(f"      {key}={val!r}")
             if isinstance(val, DataStruct):
                 for k2, v2 in vars(val).items():
-                    print(f"        {k2}={v2!r}")
+                    if isinstance(v2, int) and not k2.endswith(('len', 'size')):
+                        print(f"        {k2}=0x{v2:x}")
+                    else:
+                        print(f"        {k2}={v2!r}")
 
     print()
 
