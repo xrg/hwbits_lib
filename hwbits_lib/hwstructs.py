@@ -82,6 +82,7 @@ class DataStructMeta(type):
 
             # locate descriptor with highest offset
             cur_dyn = None
+            last_dyn = 0
             for n, descr in namespace.items():
                 if n.startswith("_"):
                     continue
@@ -92,6 +93,9 @@ class DataStructMeta(type):
                     dsize = descr._offset + dsize
                     if (not min_size) or min_size < dsize:
                         min_size = dsize
+                elif dsize is None and hasattr(descr, '_offset'):
+                    if descr._offset > last_dyn:
+                        last_dyn = descr._offset
                 if isinstance(descr, DynSizeBase):
                     if cur_dyn is not None:
                         raise TypeError(f"Duplicate dyn-size definitions: {n} and {cur_dyn}")
@@ -101,6 +105,9 @@ class DataStructMeta(type):
 
             namespace['__slots__'] = tuple(slots)
             size = kwds.pop('fixed_size', None)
+            # there is some dynamic element beyond the last known
+            # static position
+            namespace['_DataStruct__size_expand'] = (min_size and min_size <= last_dyn)
             if min_size and size is not None:
                 if min_size > size:
                     raise TypeError(f"Descriptor size in {name} is greater than "
@@ -145,9 +152,15 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
 
     def __init__(self, buf: typing.BinaryIO):
         if isinstance(buf, memoryview):
-            self._data = buf[:self.__static_size]
+            if self.__size_expand:
+                self._data = buf
+            else:
+                self._data = buf[:self.__static_size]
         else:
-            self._data = buf.read(self.__static_size)
+            if self.__size_expand:
+                self._data = buf.read()
+            else:
+                self._data = buf.read(self.__static_size)
         if self.__static_size is not None and len(self._data) < self.__static_size:
             raise IOError(5, "Stream data is shorter than struct: "
                           f"{len(self._data)} < {self.__static_size}")
