@@ -110,3 +110,9 @@ class HwRegister:
             return (self.value >> part.start) & (2 ** (part.stop - part.start + 1) - 1)
 
         raise TypeError("register indices must be integers")
+
+    def __iter__(self):
+        for name, descr in vars(self.__class__).items():
+            if (not name.startswith('_')) and isinstance(descr, HwBits):
+                yield name
+
