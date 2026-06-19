@@ -487,6 +487,18 @@ class MultiSectionsFixed(DataStructExtraData):
         setattr(data, f"_{self._name}", sections)
 
 
+def multidot_get(data: Any, var: str):
+    """Retrieve attributes of an object, N-levels deep
+
+    eg::
+        multidot_get(some_obj, 'some.var.length') -> some_obj.some.var.length
+    """
+    for key in var.split('.'):
+        data = getattr(data, key)
+
+    return data
+
+
 class MultiSectionsVar(DataStructExtraData):
     """Defines Nx sections (of some struct), variable length
 
@@ -505,15 +517,16 @@ class MultiSectionsVar(DataStructExtraData):
         self._klass = klass
 
     def _check(self, name: str, data: DataStruct) -> None:
-        num_sections = getattr(data, self._count_var)
+        num_sections = multidot_get(data, self._count_var)
         if num_sections < 0:
             raise ValueError("Negative section count")
         ksize = self._klass._DataStruct__static_size
         if len(data) < self._offset + (num_sections * ksize):
-            raise IndexError(f"Not enough data for {name}= {num_sections} * {ksize}")
+            raise IndexError(f"Not enough data for {name}= {num_sections} * {ksize} "
+                             f"in {len(data) - self._offset} parent bytes")
 
     def _init_extra(self, data: DataStruct):
-        num_sections = getattr(data, self._count_var)
+        num_sections = multidot_get(data, self._count_var)
         mv = memoryview(data._data)
         sections = []
         offset = self._offset
