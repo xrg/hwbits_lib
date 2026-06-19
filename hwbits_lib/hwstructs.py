@@ -11,10 +11,12 @@ import struct
 import typing
 import uuid
 
+from contextvars import ContextVar
 from typing import Any, Optional, Tuple, Type
 
 
 log = logging.getLogger(__name__)
+permissive_mode: ContextVar[bool] = ContextVar('permissive_mode', default=False)
 
 
 class DataStructDescr:
@@ -180,9 +182,15 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
                                   f"{len(self._data)} < {ds}")
 
         for name, descr in self.__iter_members():
-            descr._check(name, self)
-            if isinstance(descr, DataStructExtraData):
-                descr._init_extra(self)
+            try:
+                descr._check(name, self)
+                if isinstance(descr, DataStructExtraData):
+                    descr._init_extra(self)
+            except (IndexError, ValueError) as e:
+                if permissive_mode.get():
+                    log.error("Cannot set %s.%s: %s", self.__class__.__name__, name, e)
+                else:
+                    raise
 
     def __len__(self):
         return len(self._data)
@@ -200,10 +208,13 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
 
     @property
     def __dict__(self):
-        return {
-            name: descr.__get__(self, self.__class__)
-            for name, descr in self.__iter_members()
-        }
+        r = {}
+        for name, descr in self.__iter_members():
+            try:
+                r[name] = descr.__get__(self, self.__class__)
+            except AttributeError:
+                r[name] = None
+        return r
 
 
 class RegisteredDataStruct(DataStruct):
