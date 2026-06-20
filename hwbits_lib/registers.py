@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Iterable, Optional
 
 
 # fmt: off
@@ -116,3 +116,40 @@ class HwRegister:
             if (not name.startswith('_')) and isinstance(descr, HwBits):
                 yield name
 
+    def _iter_fmted(self) -> Iterable[str]:
+        """Formatted 'name=val' entries for each bitfield in this register
+        """
+        return (f"{n}={getattr(self, n)}" for n in self)
+
+
+class ValidBitsReg(HwRegister):
+    """Identical to HwRegister, only non-zero bits matter
+
+    This class is only useful for introspection, just to tell the printer
+    that attributes at zero can be omitted
+    """
+    def _iter_fmted(self) -> Iterable[str]:
+        for n in self:
+            val = getattr(self, n)
+            if val:
+                yield f"{n}={val}"
+
+
+class FieldValidBits(ValidBitsReg):
+    """Validity bits for the field structs
+
+    Indicates that the same-named fields in the parent struct are only
+    valid if these bits are set.
+
+    This class is just a hint for the formatting logic of the parent struct.
+    """
+
+
+class HexBits(HwBits):
+    """HwBits, with a hint to print them in hex
+    """
+
+    def _iter_fmted(self) -> Iterable[str]:
+        """Formatted 'name=val' entries for each bitfield in this register
+        """
+        return (f"{n}={getattr(self, n):#x}" for n in self)

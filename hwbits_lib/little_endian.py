@@ -17,7 +17,7 @@ from __future__ import annotations
 import struct
 
 from .hwstructs import DataStruct2Enum, DataStruct2Member, DynSizeBase, \
-        GUID_base, MappedGUID_base, Static
+        HexFormat, GUID_base, MappedGUID_base, Static
 
 
 class GUID(GUID_base):
@@ -38,6 +38,14 @@ class ULong(DataStruct2Member):
 
 class ULong64(DataStruct2Member):
     _struct_fmt = "<Q"
+
+
+class Address32(HexFormat, ULong):
+    """A 32-bit address"""
+
+
+class Address64(HexFormat, ULong64):
+    """A 64-bit address"""
 
 
 class StaticUL(Static):

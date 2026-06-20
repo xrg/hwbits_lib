@@ -56,12 +56,28 @@ class DataStructMember(DataStructDescr):  # pyre-ignore
     def size(self):
         return self._size
 
+    def _format(self, name: str, value: Any) -> str:
+        """Hint on how to format a value by this descriptor
+        """
+        return f"{name}={value!r}"
+
 
 class DynSizeBase:
     """Placeholder baseclass for that struct member which conveys dynamic size
 
     Subclass this to construct short/long/quad integers, little/big endian.
     """
+
+
+class HexFormat:
+    """Mix-in for members that produce an *int* and want hex formatting
+    """
+    def _format(self, name: str, value: Any) -> str:
+        if isinstance(value, int):
+            spec = f"0{self.size * 2}x"
+            return f"{name}=0x{format(value, spec)}"
+        else:
+            return super()._format(name, value)
 
 
 class DataStructMeta(type):
@@ -425,6 +441,22 @@ class Reg(DataStructMember):
         val = data[self._offset:self._offset + self._size]
         return self._reg_cls.from_bytes_lsb(val)
 
+    def _format(self, name, value):
+        """Format the contents of this register
+
+        Contents [value] /should/ be an instance of HwRegister
+        This allows `iter()` , which would yield the names of all fields.
+        Then, getting each field produces an *int*, but getting that on class
+        level produces the descriptor instance that should have `_format()`
+        defined itself.
+        """
+        from hwbits_lib.registers import HwRegister  # deferred, no cyclic import
+
+        if isinstance(value, HwRegister):
+            return f"{name}={value} [" + " ".join(value._iter_fmted()) + "]"
+        else:
+            super()._format(name, value)
+
 
 class DataStructExtraData(DataStructDescr):
     """Anything that might need extra data onto the DataStruct"""
@@ -510,6 +542,12 @@ class MultiSectionsFixed(DataStructExtraData):
             sections.append(d)
         setattr(data, f"_{self._name}", sections)
 
+    def _format(self, name, value):
+        if value is None:
+            return f"{name}=<None>"
+        else:
+            return f"{name}={self._klass.__name__}[{self._count}]"
+
 
 def multidot_get(data: Any, var: str):
     """Retrieve attributes of an object, N-levels deep
@@ -559,6 +597,12 @@ class MultiSectionsVar(DataStructExtraData):
             offset += len(d)
             sections.append(d)
         setattr(data, f"_{self._name}", sections)
+
+    def _format(self, name, value):
+        if value is None:
+            return f"{name}=<None>"
+        else:
+            return f"{name}={self._klass.__name__}[{len(value)}]"
 
 
 class ParentBody(DataStructExtraData):
@@ -712,3 +756,11 @@ class Array(DataStructExtraData):
     @property
     def size(self):
         return self._count * self._type_inst.size
+
+    def _format(self, name, val):
+        return f"{name}={self._type_inst.__class__.__name__}[{self._count}]"
+
+
+class SparseArray(Array):
+    """Array where empty elements should be skipped
+    """
