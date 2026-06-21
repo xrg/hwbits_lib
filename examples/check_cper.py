@@ -4,8 +4,9 @@ import argparse
 import logging
 import os.path
 
-from hwbits_lib.hwstructs import DataStruct
+from hwbits_lib.hwstructs import permissive_mode
 from hwbits_lib.generic_cper import CPER
+from hwbits_lib.formatting import print_obj
 
 import hwbits_lib.cper_sections as _
 
@@ -25,23 +26,7 @@ def print_cper(fname: str):
 
     print(f"  notification: {cp.notification_type}")
     for n, sec in enumerate(cp.sections):
-        xx = ""
-        if sec.valid_bits.FRU_text:
-            xx = f" on {sec.FRU_text}"
-        if sec.valid_bits.FRU_id:
-            xx += f" [{sec.FRU_id}]"
-        print(f"  section {n}: v{sec.revision} {sec.severity}{xx}")
-        print(f"    type={sec.section_type} , flags={sec.flags}")
-
-        print(f"    body type: {sec.body}")
-        for key, val in vars(sec.body).items():
-            print(f"      {key}={val!r}")
-            if isinstance(val, DataStruct):
-                for k2, v2 in vars(val).items():
-                    if isinstance(v2, int) and not k2.endswith(('len', 'size')):
-                        print(f"        {k2}=0x{v2:x}")
-                    else:
-                        print(f"        {k2}={v2!r}")
+        print_obj(sec, f"section {n}", initial_indent=" ", subsequent_indent="    ")
 
     print()
 
@@ -53,6 +38,7 @@ def main():
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
+    permissive_mode.set(True)
 
     log = logging.getLogger('main')
     for fname in args.files:
