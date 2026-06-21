@@ -93,19 +93,42 @@ class DataStructMeta(type):
 
         if bases:  # subclasses of DataStruct, that is
             slots = []
+            cur_dyn = None
+            min_size = kwds.pop('min_size', None)
+            size_expand = False
+            # locate descriptor with highest offset
+            last_dyn = 0
+            field_descrs = []
+            empty_struct = kwds.pop('empty_struct', False)
+
             for b in bases:
                 if sls := getattr(b, '__slots__', None):
                     slots += sls
-            min_size = kwds.pop('min_size', None)
+                if dsize := getattr(b, '_DataStruct__static_size', None):
+                    if min_size is None or dsize > min_size:
+                        min_size = dsize
+                    if getattr(b, '_DataStruct__size_expand', False):
+                        last_dyn = dsize
 
-            # locate descriptor with highest offset
-            cur_dyn = None
-            last_dyn = 0
+                if cur_dyn is None:
+                    cur_dyn = getattr(b, '_DataStruct__dyn_size_member', None)
+
+                for f in getattr(b, '__field_descrs', ()):
+                    if f not in field_descrs:
+                        field_descrs.append(f)
+
+                # descendants of this need to isntantiate as empty
+                if getattr(b, '_empty_subclasses', False):
+                    empty_struct = True
+
             for n, descr in namespace.items():
                 if n.startswith("_"):
                     continue
                 if not isinstance(descr, DataStructDescr):
                     continue
+                if n not in field_descrs:
+                    field_descrs.append(n)
+
                 dsize = descr.size
                 if dsize and hasattr(descr, '_offset'):
                     dsize = descr._offset + dsize
@@ -125,7 +148,9 @@ class DataStructMeta(type):
             size = kwds.pop('fixed_size', None)
             # there is some dynamic element beyond the last known
             # static position
-            namespace['_DataStruct__size_expand'] = (min_size and min_size <= last_dyn)
+            if min_size and min_size <= last_dyn:
+                size_expand = True
+            namespace['_DataStruct__size_expand'] = size_expand
             if min_size and size is not None:
                 if min_size > size:
                     raise TypeError(f"Descriptor size in {name} is greater than "
@@ -134,6 +159,9 @@ class DataStructMeta(type):
                 size = min_size
             namespace['_DataStruct__static_size'] = size
             namespace['_DataStruct__dyn_size_member'] = cur_dyn
+            if field_descrs or empty_struct:
+                # only set it in classes that have fields or inherit some
+                namespace['__field_descrs'] = tuple(field_descrs)
 
         return super().__new__(metacls, name, bases, namespace, **kwds)
 
@@ -160,15 +188,11 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
     __slots__ = ("_data", )
     _name_var: Optional[str] = None
 
-    @classmethod
-    def __iter_members(cls):
-        for n, descr in cls.__dict__.items():
-            if n.startswith('__'):
-                continue
-            if isinstance(descr, DataStructDescr):
-                yield n, descr
-
     def __init__(self, buf: typing.BinaryIO):
+        field_descrs = getattr(self.__class__, '__field_descrs', None)
+        if field_descrs is None:
+            raise TypeError(f"Cannot instantiate base {self.__class__.__name__} class")
+
         if isinstance(buf, memoryview):
             if self.__size_expand:
                 self._data = buf
@@ -197,7 +221,8 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
                     raise IOError(5, "Stream data is shorter than expected: "
                                   f"{len(self._data)} < {ds}")
 
-        for name, descr in self.__iter_members():
+        for name in field_descrs:
+            descr = getattr(self.__class__, name)
             try:
                 descr._check(name, self)
                 if isinstance(descr, DataStructExtraData):
@@ -207,6 +232,9 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
                     log.error("Cannot set %s.%s: %s", self.__class__.__name__, name, e)
                 else:
                     raise
+
+    def __dir__(self):
+        return getattr(self.__class__, '__field_descrs')
 
     def __len__(self):
         return len(self._data)
@@ -225,9 +253,9 @@ class DataStruct(metaclass=DataStructMeta):  # pyre-ignore
     @property
     def __dict__(self):
         r = {}
-        for name, descr in self.__iter_members():
+        for name in getattr(self.__class__, '__field_descrs'):
             try:
-                r[name] = descr.__get__(self, self.__class__)
+                r[name] = getattr(self, name)
             except AttributeError:
                 r[name] = None
         return r
@@ -249,6 +277,7 @@ class RegisteredDataStruct(DataStruct):
         AltPayloads._lookup(key="color", val="green") -> GreenPayload
 
     """
+    _empty_subclasses = True  # all subclasses will get 'empty_struct=True'
 
     def __init_subclass__(cls, /, **kwargs):
         for k in list(kwargs):
@@ -256,6 +285,9 @@ class RegisteredDataStruct(DataStruct):
                 val = kwargs.pop(k)
                 reg = getattr(cls, f"_{k}_registry")
                 reg[val] = cls
+                # A registered class should work even if empty
+                if not hasattr(cls, '__field_descrs'):
+                    setattr(cls, '__field_descrs', ())
 
         super().__init_subclass__(**kwargs)
 
