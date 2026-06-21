@@ -14,7 +14,6 @@ from .hwstructs import (
     LookupParent,
     MultiSectionsVar,
     Nested,
-    ParentBody,
     Reg,
     RegisteredDataStruct,
     Static,
@@ -23,18 +22,18 @@ from .hwstructs import (
 )
 from .little_endian import DynSizeUL, GUID, MappedGUID, \
         StaticUL, ULong, ULong64, ULongEnum, UShort
-from .registers import HwBits, HwRegister
+from .registers import HwBits, HwRegister, FieldValidBits, ValidBitsReg
 
 from .cper_consts import NotificationTypes, Severity
 
 
-class CPER_valid_bits(HwRegister):
+class CPER_valid_bits(FieldValidBits):
     platform_id = HwBits(0)
     timestamp = HwBits(1)
     partition_id = HwBits(2)
 
 
-class CPER_flags(HwRegister):
+class CPER_flags(ValidBitsReg):
     recovered = HwBits(0)
     preverr = HwBits(1, doc="Qualifies an error condition as one "
                             "that occurred during a previous session.")
@@ -49,12 +48,12 @@ class CPER_revision(DataStruct):
         return f"{self.major}.{self.minor}"
 
 
-class CPER_section_valid(HwRegister):
+class CPER_section_valid(FieldValidBits):
     FRU_id = HwBits(0)
     FRU_text = HwBits(1)
 
 
-class CPER_section_flags(HwRegister):
+class CPER_section_flags(ValidBitsReg):
     primary = HwBits(0)
     containment_warning = HwBits(1)
     reset = HwBits(2)
